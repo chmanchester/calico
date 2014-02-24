@@ -11,7 +11,7 @@
 
 \section{Introduction}
 
-Calico is a C source code rewriter to be used to perform runtime metamorphic property testing on C programs. Calico takes a C source file as input in which one or more functions has been annotated by the user according to an annotation language used to specify metamorphic properties. Calico's output is a C program that behaves exactly as the original, except that each time an annotated function is called, it is called again with tranformed inputs, and the result is recorded. The original output is also transformed, and it is asserted by the new program that the two results are equal. If they are, nothing has been demonstrated about the correctness of the program, but if they are not, then a metamorphic property asserted by the user has been violated, and the function under test has been to shown to contain a fault.
+Calico is a C source code translator and annotation language used to perform runtime metamorphic property testing of C programs. Calico takes a C source file as input in which one or more functions has been annotated by the user according to an annotation language used to specify metamorphic properties. Calico's output is a C program that behaves exactly as the original, except that each time an annotated function is called, it is called again with transformed inputs, and the result is recorded. The original output is also transformed, and it is asserted by the new program that the two results are equal. If they are, nothing has been demonstrated about the correctness of the program, but if they are not, then a metamorphic property asserted by the user has been violated, and the function under test has been to shown to contain a fault.
 
 \begin{figure}[ht!]
 \centering
@@ -21,7 +21,7 @@ Calico is a C source code rewriter to be used to perform runtime metamorphic pro
 
 \section{A Brief Description of Calico Instrumentation}
 
-Many functions use side effects to accomplish their task. Furthermore, the data that might constitute the ``result'' of a C function is not necessarily the same as the return value of that function. It is therefore necessary to assume that any piece of memory belonging to the process of the program might be considered for the purpose of these assertions. It is neccessary to sandbox the effects of the function under test each time it is called by spawning a new process for each property being asserted. For instance, if a function is called by the application 100 times over the course of program execution, and three properties about the function are being specified, then the instrumented program must make 400 calls to the function: The original 100, plus 100 for each specified input transformation. For each of the 300 transformed calls, a process must be spawned and the result recovered by the main process through the use of shared memory.
+Many functions use side effects to accomplish their task. Furthermore, the data that might constitute the ``result'' of a C function is not necessarily the same as the return value of that function. It is therefore necessary to assume that any piece of memory belonging to the process of the program might be considered for the purpose of these assertions. It is necessary to sandbox the effects of the function under test each time it is called by spawning a new process for each property asserted. For instance, if a function is called by the application 100 times over the course of program execution, and three properties about the function are specified, then the instrumented program must make 400 calls to the function: The original 100, plus 100 for each specified input transformation. For each of the 300 transformed calls, a process must be spawned and the result recovered by the main process through the use of shared memory.
 
 The form of the instrumented application is as follows:
 
@@ -35,10 +35,9 @@ The form of the instrumented application is as follows:
 
 Annotations are written in C comments directly preceding the function under test.
 
-A function annotation starts with a section containing information about the return type of the function under test, the return type of each parameter, and the identifiers associated with the function and each of its parameters. Metamorphic properties are then specified by one or more sets of property annotations. A property annotation set consists of an input property to transform each input, an output property to transform the output of the function, and two optional annotations. The optional state recovery annotation is used to specify a pointer to memory that is to be considered the output of the function, while the optional equality annotation will be used in these cases if a notion of equality other than bitwise equality (implemented with memcmp), is to be used to compare the original and transformed outputs.
+A function annotation starts with a section containing information about the return type of the function under test, the return type of each parameter, and the identifiers associated with the function and each of its parameters. Metamorphic properties are then specified by one or more sets of property annotations. A property annotation set consists of an input property to transform each input, an output property to transform the output of the function, and two optional annotations. The optional state recovery annotation is used to specify a pointer to memory that is to be considered the result of the function, while the optional equality annotation will be used in these cases if a notion of equality other than bitwise equality (implemented with memcmp) should be used to compare the original and transformed outputs.
 
 A more formal description of the annotation language is given by the following grammar. Non-terminals are enclosed by angle braces. All other symbols compose terminals in the grammar. The non-terminal ``string-literal'' corresponds to any sequence of characters enclosed by quotations, while the non-terminal ``C-identifier'' corresponds to identifiers specified by the C language.
-
 
 \ttfamily
 
@@ -67,7 +66,7 @@ A more formal description of the annotation language is given by the following g
 
 <state-recovery> ::= @state-recover \{ <property-elem>, <property-elem>, <property-elem> \} ;
 
-<state-recovery> ::= @equality-op \{ <property-elem> \} ;
+<equality> ::= @equality-op \{ <property-elem> \} ;
 
 <property-elem> ::= <C-identifier> \\
 \phantom{1}\hspace{85pt}| <string-literal> \\
@@ -79,7 +78,7 @@ A more formal description of the annotation language is given by the following g
 
 \section{A short example: summing an array}
 
-The following file (sum\_example.c) contains a function, sum, and a stub main function which simply calls sum on a small array and prints the result:
+The following file (sum\_example.c) contains a function, sum, and a stub main function which calls sum on a small array and prints the result:
 
 \begin{verbatim}
 #include <stdio.h>
@@ -111,7 +110,7 @@ int main () {
 }
 \end{verbatim}
 
-the sum function has been annotated to assert two of its metamorphic properties. The first is that if each element of the input array is doubled, the resulting output should also be doubled. The second is that if the original array is replaced with one of twice its length consisting of the original array end to end, the result should be double.
+The sum function has been annotated to assert two of its metamorphic properties. The first is that if each element of the input array is doubled, the resulting output should also be doubled. The second is that if the original array is replaced with one of twice its length consisting of the original array end to end, the result should be double.
 
 Instrumentation by calico results in the following file (calico\_gen\_sum\_example.c):
 
@@ -236,25 +235,25 @@ int main () {
 
 \section{Known Limitations/Future Work}
 
-\subsection{probabalistic testing}
+\subsection{probabilistic testing}
 
-Instrumenting an application causes its runtime to increase, mostly due to the overhead of spawning new processes (The specific runtime costs associated with instrumentation are described in the next section). One feature that would allow the user to mitigate this problem would be to optionally accept a probability parameter through the annotation language. This probability, set to 1 by default, would determine the likelihood of a test being run each time a function under test is called by the application. In this way, the probability parameter can be fine-tuned such that performance comes back within whatever range is considered acceptable to the user. Because of the element of randomness in such a feature, a bias where certain kinds of inputs from the application are under-represented during testing would be unlikely, even though fewer total tests are being run.
+Instrumenting an application causes its runtime to increase, primarily due to the overhead of spawning new processes (The specific runtime costs associated with instrumentation are described in the next section). One feature that would allow the user to mitigate this would be to optionally accept a probability parameter through the annotation language. This probability, set to 1 by default, would determine the likelihood of a test being run each time a function under test is called by the application. In this way, the probability parameter can be fine-tuned such that performance comes back within whatever range is considered acceptable to the user. Because of the element of randomness in such a feature, a bias in which certain kinds of inputs from the application are under-represented during testing would be unlikely, even though fewer total tests would be run.
 
 \subsection{more sophisticated parsing methods}
 
-The current implementation of the annotation parser requires information about the function under test and each of its parameters to be specified in the annotation language. This information must correspond to the source exactly, and duplicates the information in the function header. To reduce the user's burden while annotating the function and mitigate errors due to mis-annotation, the parser could instead completely parse of the declarations in the function header to determine the required names and types of the function and parameters directly.
+The current implementation of the annotation parser requires information about the function under test and each of its parameters to be specified in the annotation language. This information must correspond to the source exactly, and duplicates the information in the function header. To reduce the user's burden while annotating the function and mitigate errors due to mis-annotation, the parser could instead parse the declarations in the function header to determine the required names and types of the function and parameters directly.
 
 \subsection{optimizations in memory management}
 
-Calico will not optimally instrument a certain subset of C functions with respect to memory managment. Notably, functions which perform side effects on large regions of memory will create redundant copies of those regions in the instrumented version of the function. Changes could be made to calico's source translator that cause it to identify situations where copying memory is not necessary and direct reads of data to an original result location rather than a copied version.
+Calico will not optimally instrument a certain subset of C functions with respect to memory management. Notably, functions which perform side effects on large regions of memory will create redundant copies of those regions in the instrumented version of the function. Changes could be made to calico's source translator that cause it to identify situations where copying memory is not necessary and direct reads of data to an original location rather than a location containing a copy.
 
-Benefits of this feature in terms of space complexity would be linear with respect to the size of the inputs and outputs of the function under test. Benefits in terms of runtime complexity would be the similar, however the overhead of process spawning and deallocation is expected to be more expensive than these calls to memcpy, and significant runtime gains should not be expected unless the input or output sizes are extremely large.
+Benefits of this feature in terms of space complexity would be linear with respect to the size of the inputs and outputs of the function under test. Benefits in terms of runtime complexity would be the similar, however the overhead of process spawning and deallocation is expected to be more expensive than these calls to memcpy, and significant runtime gains should not be expected.
 
 \section{Performance Measurement}
 
 An experiment was run using a Machine Learning application called Martirank. Martirank contains an implementation of merge sort which takes as input the location of an array, and type and size information about the elements of that array. It then sorts the array in place.
 
-This function was annotated to assert the following metamorphic property: If the elements of the input array are permuted, the resulting array should be the same. Note that because the array is sorted in-place, the ``result'' as we are choosing to think about it now is not the same as the return value of the function. This is handled with the optional state recovery and equality annotions described earlier.
+This function was annotated to assert the following metamorphic property: If the elements of the input array are permuted, the resulting array should be the same. Note that because the array is sorted in-place, the ``result'' as we are choosing to think about it now is not the same as the return value of the function. This is handled with the optional state recovery and equality annotations described earlier.
 
 Martirank was run and timed with an example dataset. An instrumented version was created and timed using the same dataset, and the following results were observed:
 
@@ -267,7 +266,7 @@ new processes spawned & 0 & $11047$
 
 Our resultant estimation of added runtime per assertion is $\frac{24.403}{11047} = {\mathbf .0022}$ seconds.
 
-Note that the original runtime was not subracted from the total, since the experiment was run on a multi-core machine that parallelized the new calls with the old. Thus, the new calls are assumed to represent the main runtime bottleneck of the program.
+Note that the original runtime was not subtracted from the total, since the experiment was run on a multi-core machine that parallelized the new calls with the old. Thus, the new calls are assumed to represent the main runtime bottleneck of the program.
 
 \section{Calico's Implementation}
 
@@ -275,19 +274,7 @@ Calico is implemented in OCaml, a functional language well-suited to the task of
 
 \subsection{Description of the Parser}
 
-The Parser consists of a series of transformations based on an annotated C source. First, the source file is parsed into sections of C source and comments (those indicated with ``/*'' and ``*/''). The resulting list of program elements is traversed and inspected for the presence of annotated functions. If an annotated comment is detected (by the presence of a function info annotation in the comment text), the parser attempts to parse the comment according to the annotation language and if succesful replaces this comment/source pair in the list of program elements with an annotated function data structure composed of information about the function and its annotations, the original function header, and the original function body. If no errors are encountered, the resulting list of program elements and function annotations compose the output of the parser module.
-
-Calico's parser is implemented using Ocamlyacc ... %TODO
-
-The end result is an instance of the data structure defined in ast.ml, which serves as an interface between the parser and writer.
-
-% \subsection{Description of the abstract syntax tree}
-
-% sourceUnderTest: represents an entire C application. Consists of the name of the original C file and a list of program elements.
-
-% program_element: SrcStr represents source code that is not annotated and should be copied into the instrumented file verbatim. ComStr is a C comment which is not part of the annotation language and should also be copied over as-is. AFun represents an annotated function consisting of a comment that is part of the annotation language, the function header, and the body of the function.
-
-% annotated_comment:
+The Parser consists of a series of transformations based on an annotated C source. First, the source file is parsed into sections of C source and comments (those indicated with ``/*'' and ``*/''). The resulting list of program elements is traversed and inspected for the presence of annotated functions. If an annotated comment is detected (by the presence of a function info annotation in the comment text), the parser attempts to parse the comment according to the annotation language and if successful replaces this comment/source pair in the list of program elements with an annotated function data structure composed of information about the function and its annotations, the original function header, and the original function body. If no errors are encountered, the resulting list of program elements and function annotations are output for use by the source translator.
 
 \subsection{Description of the Source Translator}
 

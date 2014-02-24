@@ -1,0 +1,17 @@
+CIS 573 Final Project
+Chris Manchester
+Orren Saltzman
+December, 2013
+
+This folder contains a makefile that will compile the main executable for
+Calico and run a variety of examples (from the examples/ and martirank/
+directories). The tool requires an ocaml and C compiler. It is known to
+work correctly with ocamlc 3.12.1 and gcc 4.7.2.
+
+Generated C files are stored in the examples/ folder, while generated
+executables are stored in the top level directory. Both may be removed
+by running the clean target.
+
+Documentation and a writeup of the tool is in the documentation/ folder.
+The martirank/ folder contains sources for the martirank application used
+in experiments.

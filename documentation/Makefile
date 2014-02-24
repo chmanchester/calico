@@ -1,2 +1,2 @@
 doc:
-	pdflatex \\nonstopmode\\input README.tex
+	pdflatex \\nonstopmode\\input WriteUp.tex

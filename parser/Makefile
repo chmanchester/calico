@@ -11,6 +11,7 @@ SOURCES =      \
 	comlexer.ml
 
 GEN_SOURCES =  \
+	comparser.mli \
 	comparser.ml \
 	comlexer.ml  \
 	srclexer.ml  \
